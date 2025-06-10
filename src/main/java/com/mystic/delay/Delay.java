@@ -1,42 +1,37 @@
 package com.mystic.delay;
 
-import net.minecraft.world.effect.AbsoptionMobEffect;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
-import net.minecraftforge.event.entity.living.LivingHealEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModContainer;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHealEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 @Mod(Delay.MODID)
-@Mod.EventBusSubscriber()
 public class Delay {
     public static final String MODID = "delay";
 
     public Delay(IEventBus modEventBus, ModContainer modContainer) {
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private static final Map<UUID, Long> lastDamageTime = new HashMap<>();
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-
-        Player player = event.player;
+    public void onPlayerTick(PlayerTickEvent.Pre event) {
+        Player player = event.getEntity();
         if (player.level().isClientSide) return;
 
         Long lastHurt = lastDamageTime.get(player.getUUID());
@@ -55,18 +50,18 @@ public class Delay {
     }
 
     @SubscribeEvent
-    public static void onPlayerHurt(LivingHurtEvent event) {
+    public void onPlayerHurt(LivingDamageEvent.Post event) {
         if (event.getEntity() instanceof Player player) {
             lastDamageTime.put(player.getUUID(), player.level().getGameTime());
         }
     }
 
     @SubscribeEvent
-    public static void onItemUseStart(LivingEntityUseItemEvent.Start event) {
+    public void onItemUseStart(LivingEntityUseItemEvent.Start event) {
         if (event.getEntity() instanceof Player player) {
             Long lastHurt = lastDamageTime.get(player.getUUID());
             if (lastHurt != null && player.level().getGameTime() - lastHurt < Config.delay) {
-                if (event.getItem().isEdible()) {
+                if (event.getItem().getFoodProperties(player) != null) {
                     event.setCanceled(true);
                 }
             }
@@ -74,7 +69,7 @@ public class Delay {
     }
 
     @SubscribeEvent
-    public static void onLivingHeal(LivingHealEvent event) {
+    public void onLivingHeal(LivingHealEvent event) {
         if (event.getEntity() instanceof Player player) {
             Long lastHurt = lastDamageTime.get(player.getUUID());
             if (lastHurt != null && player.level().getGameTime() - lastHurt < Config.delay) {
