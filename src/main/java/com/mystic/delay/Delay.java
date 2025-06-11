@@ -42,24 +42,45 @@ public class Delay {
         if (lastHurt == null) return;
 
         long timeSinceDamage = player.level().getGameTime() - lastHurt;
+
         if (timeSinceDamage < Config.delay) {
             var foodData = player.getFoodData();
 
-            // Block saturation gain during delay
-            if (foodData.getSaturationLevel() > 0f) {
-                foodData.setSaturation(0f);
+            // Save food level before zeroing saturation (only once)
+            if (!preDamageHunger.containsKey(uuid)) {
+                preDamageHunger.put(uuid, foodData.getFoodLevel());
+                preDamageSaturation.put(uuid, foodData.getSaturationLevel());
             }
 
-            if (!player.hasEffect(MobEffects.HUNGER)) {
-                foodData.setFoodLevel(20); // Optional: cap visible food
+            // Only prevent healing if the player is not starving
+            if (foodData.getFoodLevel() > Config.starvationThreshold) {
+                foodData.setSaturation(0f);
+                foodData.setFoodLevel(20);
+            }
+
+            // Optional: prevent certain healing effects
+            if (Config.stopAbsorption && player.hasEffect(MobEffects.ABSORPTION)) {
+                player.removeEffect(MobEffects.ABSORPTION);
+            }
+            if (player.hasEffect(MobEffects.REGENERATION)) {
+                player.removeEffect(MobEffects.REGENERATION);
+            }
+            if (player.hasEffect(MobEffects.SATURATION)) {
+                player.removeEffect(MobEffects.SATURATION);
             }
 
         } else {
-            // Restore values after delay
+            // Restore hunger only if it was previously saved
             if (preDamageHunger.containsKey(uuid) && preDamageSaturation.containsKey(uuid)) {
                 var foodData = player.getFoodData();
-                foodData.setFoodLevel(preDamageHunger.remove(uuid));
-                foodData.setSaturation(preDamageSaturation.remove(uuid));
+
+                int oldHunger = preDamageHunger.remove(uuid);
+                float oldSaturation = preDamageSaturation.remove(uuid);
+
+                foodData.setFoodLevel(oldHunger);
+                foodData.setSaturation(oldSaturation);
+                System.out.println("Restored hunger=" + oldHunger);
+                System.out.println("Restored saturation=" + oldSaturation);
             }
 
             lastDamageTime.remove(uuid);
@@ -77,12 +98,16 @@ public class Delay {
     }
 
     @SubscribeEvent
-    public static void onItemUseStart(LivingEntityUseItemEvent.Start event) {
+    public void onItemUseTick(LivingEntityUseItemEvent event) {
         if (event.getEntity() instanceof Player player) {
             Long lastHurt = lastDamageTime.get(player.getUUID());
             if (lastHurt != null && player.level().getGameTime() - lastHurt < Config.delay) {
                 if (event.getItem().getFoodProperties(player) != null) {
-                    event.setCanceled(true);
+                    var food = player.getFoodData();
+                    if (food.getFoodLevel() > Config.starvationThreshold) { // Allow eating only when starving
+                        event.setCanceled(true);
+                        player.releaseUsingItem(); // Stop the eating animation
+                    }
                 }
             }
         }
