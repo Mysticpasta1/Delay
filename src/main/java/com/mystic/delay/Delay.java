@@ -79,8 +79,6 @@ public class Delay {
 
                 foodData.setFoodLevel(oldHunger);
                 foodData.setSaturation(oldSaturation);
-                System.out.println("Restored hunger=" + oldHunger);
-                System.out.println("Restored saturation=" + oldSaturation);
             }
 
             lastDamageTime.remove(uuid);
