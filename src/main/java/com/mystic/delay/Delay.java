@@ -77,8 +77,6 @@ public class Delay {
 
                 foodData.setFoodLevel(oldHunger);
                 foodData.setSaturation(oldSaturation);
-                System.out.println("Restored hunger=" + oldHunger);
-                System.out.println("Restored saturation=" + oldSaturation);
             }
 
             lastDamageTime.remove(uuid);
@@ -93,8 +91,6 @@ public class Delay {
                 // Only save if not already in delay
                 preDamageHunger.put(uuid, player.getFoodData().getFoodLevel());
                 preDamageSaturation.put(uuid, player.getFoodData().getSaturationLevel());
-                System.out.println("Saved hunger=" + preDamageHunger.get(uuid));
-                System.out.println("Saved saturation=" + preDamageSaturation.get(uuid));
             }
             lastDamageTime.put(uuid, player.level().getGameTime());
         }
