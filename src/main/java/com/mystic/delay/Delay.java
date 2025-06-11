@@ -27,6 +27,8 @@ public class Delay {
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
+    private static final Map<UUID, Integer> preDamageHunger = new HashMap<>();
+    private static final Map<UUID, Float> preDamageSaturation = new HashMap<>();
     private static final Map<UUID, Long> lastDamageTime = new HashMap<>();
 
     @SubscribeEvent
@@ -34,25 +36,42 @@ public class Delay {
         Player player = event.getEntity();
         if (player.level().isClientSide) return;
 
-        Long lastHurt = lastDamageTime.get(player.getUUID());
-        if (lastHurt != null && player.level().getGameTime() - lastHurt < Config.delay) {
+        UUID uuid = player.getUUID();
+        Long lastHurt = lastDamageTime.get(uuid);
+        if (lastHurt == null) return;
+
+        long timeSinceDamage = player.level().getGameTime() - lastHurt;
+        if (timeSinceDamage < Config.delay) {
             var foodData = player.getFoodData();
 
-            // Block saturation
+            // Block saturation gain during delay
             if (foodData.getSaturationLevel() > 0f) {
                 foodData.setSaturation(0f);
             }
 
             if (!player.hasEffect(MobEffects.HUNGER)) {
-                foodData.setFoodLevel(20);
+                foodData.setFoodLevel(20); // Optional: cap visible food
             }
+
+        } else {
+            // Restore values after delay
+            if (preDamageHunger.containsKey(uuid) && preDamageSaturation.containsKey(uuid)) {
+                var foodData = player.getFoodData();
+                foodData.setFoodLevel(preDamageHunger.remove(uuid));
+                foodData.setSaturation(preDamageSaturation.remove(uuid));
+            }
+
+            lastDamageTime.remove(uuid);
         }
     }
 
     @SubscribeEvent
     public void onPlayerHurt(LivingDamageEvent.Post event) {
         if (event.getEntity() instanceof Player player) {
-            lastDamageTime.put(player.getUUID(), player.level().getGameTime());
+            UUID uuid = player.getUUID();
+            preDamageHunger.put(uuid, player.getFoodData().getFoodLevel());
+            preDamageSaturation.put(uuid, player.getFoodData().getSaturationLevel());
+            lastDamageTime.put(uuid, player.level().getGameTime());
         }
     }
 
